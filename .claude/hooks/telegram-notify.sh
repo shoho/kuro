@@ -14,6 +14,14 @@ SUMMARY=$(python3 -c "
 import sys, json, html as html_mod
 
 data = json.load(sys.stdin)
+
+# Debug: dump raw hook data
+import datetime
+with open('/tmp/hook_debug.log', 'a') as f:
+    f.write('--- ' + datetime.datetime.now().isoformat() + ' ---\n')
+    json.dump(data, f, indent=2, ensure_ascii=False)
+    f.write('\n')
+
 text = data.get('last_assistant_message', '').strip()
 
 if not text:
