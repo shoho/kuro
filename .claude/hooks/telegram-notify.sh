@@ -9,55 +9,30 @@ if [ -f "$SCRIPT_DIR/.env" ]; then
     set +a
 fi
 
-# Read hook data from stdin
-HOOK_DATA=$(cat)
+# Read hook data from stdin and extract assistant_message
+SUMMARY=$(python3 -c "
+import sys, json, html as html_mod
 
-# Extract transcript_path from hook data
-TRANSCRIPT_PATH=$(echo "$HOOK_DATA" | python3 -c "
-import sys, json
 data = json.load(sys.stdin)
-print(data.get('transcript_path', ''))
+text = data.get('last_assistant_message', '').strip()
+
+if not text:
+    sys.exit(0)
+
+# Escape HTML special chars but preserve <b></b> tags (CLAUDE.md output format)
+text = html_mod.escape(text)
+text = text.replace('&lt;b&gt;', '<b>').replace('&lt;/b&gt;', '</b>')
+
+if len(text) > 4000:
+    text = text[:4000] + '...'
+print(text)
 " 2>/dev/null)
-
-# Extract last assistant text message from transcript JSONL
-SUMMARY=""
-if [ -n "$TRANSCRIPT_PATH" ] && [ -f "$TRANSCRIPT_PATH" ]; then
-    SUMMARY=$(python3 -c "
-import json, sys
-
-transcript_path = sys.argv[1]
-summary = ''
-
-with open(transcript_path, 'r') as f:
-    for line in f:
-        line = line.strip()
-        if not line:
-            continue
-        try:
-            entry = json.loads(line)
-        except json.JSONDecodeError:
-            continue
-        if entry.get('type') == 'assistant':
-            message = entry.get('message', {})
-            content = message.get('content', '')
-            if isinstance(content, list):
-                texts = [c.get('text', '') for c in content if c.get('type') == 'text' and c.get('text', '').strip()]
-                if texts:
-                    summary = '\n'.join(texts)
-            elif isinstance(content, str) and content.strip():
-                summary = content
-
-summary = summary.strip()
-if len(summary) > 4000:
-    summary = summary[:4000] + '...'
-print(summary)
-" "$TRANSCRIPT_PATH" 2>/dev/null)
-fi
 
 # Only send if we have an actual assistant response
 if [ -n "$SUMMARY" ]; then
     curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
         --data-urlencode "text=${SUMMARY}" \
         -d chat_id="${TELEGRAM_CHAT_ID}" \
+        -d parse_mode="HTML" \
         > /dev/null 2>&1
 fi
