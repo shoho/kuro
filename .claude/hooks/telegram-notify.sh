@@ -15,17 +15,6 @@ import sys, json, html as html_mod
 
 data = json.load(sys.stdin)
 
-# Debug: send hook JSON keys to Telegram instead of normal message
-lines = ['[HOOK DEBUG]']
-for k, v in data.items():
-    if k == 'last_assistant_message':
-        preview = str(v)[:80] + '...' if len(str(v)) > 80 else str(v)
-    else:
-        preview = str(v)
-    lines.append(f'{k}: {preview}')
-print('\n'.join(lines))
-sys.exit(0)
-
 text = data.get('last_assistant_message', '').strip()
 
 if not text:
